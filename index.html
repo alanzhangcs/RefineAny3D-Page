@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RefineAny3D: Depth Refinement as Semantic Alignment for Monocular 3D Detection</title>
+  <meta name="description" content="RefineAny3D (NeurIPS 2026): a vision-language model that refines the depth of any 3D box by judging how its projection aligns with the object.">
+  <meta property="og:title" content="RefineAny3D — Depth Refinement as Semantic Alignment">
+  <meta property="og:description" content="A too-far box projects too small; a too-close box projects too large. RefineAny3D turns depth refinement into visual alignment with action tokens. NeurIPS 2026.">
+  <meta property="og:image" content="static/images/teaser.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('refineany3d-theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+  <!-- ───────── NAV ───────── -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="#top">Refine<span>Any3D</span></a>
+      <div class="nav-links">
+        <a href="#insight">Insight</a>
+        <a href="#method">Method</a>
+        <a href="#results">Results</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#bibtex">BibTeX</a>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+    </div>
+  </nav>
+
+  <!-- ───────── HERO ───────── -->
+  <header class="hero" id="top">
+    <div class="hero-grid" aria-hidden="true"></div>
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <p class="hero-eyebrow">RefineAny3D</p>
+      <h1 class="hero-title">
+        Depth Refinement as Semantic Alignment<br class="br-wide"> for Monocular 3D Detection
+      </h1>
+
+      <p class="authors">
+        <span class="au"><a href="https://alanzhangcs.github.io/">Zhihao Zhang</a><sup>1</sup></span>
+        <span class="au"><a href="https://gengdavid.github.io/">Gengwei Zhang</a><sup>2</sup></span>
+        <span class="au"><a href="https://tianlong-chen.github.io/">Tianlong Chen</a><sup>2</sup></span>
+        <span class="au"><a href="https://cs.unc.edu/person/xiaoming-liu/">Xiaoming Liu</a><sup>1,2</sup></span>
+      </p>
+      <p class="affils">
+        <span><sup>1</sup>Michigan State University</span>
+        <span><sup>2</sup>University of North Carolina at Chapel Hill</span>
+      </p>
+
+      <div class="hero-buttons">
+        <span class="btn is-disabled" title="Coming soon"><i class="fas fa-file-pdf"></i>Paper<small>soon</small></span>
+        <span class="btn is-disabled" title="Coming soon"><i class="fas fa-scroll"></i>arXiv<small>soon</small></span>
+        <a class="btn" href="https://github.com/alanzhangcs/RefineAny3D"><i class="fab fa-github"></i>Code</a>
+        <a class="btn" href="#bibtex"><i class="fas fa-quote-right"></i>BibTeX</a>
+      </div>
+      <div class="venue-pill"><span class="dot"></span>NeurIPS 2026</div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ───────── TEASER + TL;DR ───────── -->
+    <section class="teaser-wrap">
+      <figure class="card figure teaser reveal">
+        <a href="static/images/teaser.png" data-lightbox><img src="static/images/teaser.png" alt="RefineAny3D overview: depth is the bottleneck, reason-act-refine loop, semantic alignment, and results" width="2000" height="1167"></a>
+        <figcaption>
+          <b>(a)</b> Object depth is the bottleneck: ground-truth depth adds +29.92 AP<sub>3D</sub> on Omni3D, while a depth foundation model (DFM) <em>lowers</em> it by 3.68.
+          <b>(b)</b> A VLM emits action tokens that iteratively adjust depth.
+          <b>(c)</b> Depth error has a visual signature: a too-close box projects too large.
+          <b>(d)</b> Plug-and-play gains on closed-set detection, open-vocabulary detection, and auto-labeling.
+        </figcaption>
+      </figure>
+
+      <div class="tldr reveal">
+        <span class="tldr-tag">TL;DR</span>
+        <p>
+          Project a candidate 3D box onto the image: if it is <b>too far</b>, the wireframe looks <b>too small</b>;
+          if it is <b>too close</b>, it looks <b>too large</b>. RefineAny3D turns depth refinement into this visual
+          judgment. A vision-language model reasons about the wireframe and emits <b>action tokens</b>
+          (direction + magnitude) instead of a number, and repeats until the box fits.
+        </p>
+      </div>
+
+      <div class="stats reveal">
+        <div class="stat">
+          <div class="stat-num"><span data-count="3.49" data-prefix="+">+3.49</span></div>
+          <div class="stat-label">AP<sub>3D</sub> Mod. on KITTI val<br>over MonoCoP</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num"><span data-count="4.35" data-prefix="+">+4.35</span></div>
+          <div class="stat-label">AP<sub>3D</sub> on Omni3D<br>over DetAny3D</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num"><span data-count="2.37" data-prefix="+">+2.37</span></div>
+          <div class="stat-label">AP<sub>3D</sub> Mod. from refined<br>LabelAny3D labels</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num"><span data-count="1.62" data-decimals="2">1.62</span></div>
+          <div class="stat-label">VLM calls per object<br>on average</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── INTERACTIVE ───────── -->
+    <section class="section" id="insight">
+      <div class="section-head reveal">
+        <p class="kicker">The key insight</p>
+        <h2>Depth error is something you can see</h2>
+        <p class="lead">
+          Once a 3D box is projected onto the image, camera intrinsics and metric scale are absorbed into the
+          projection. What is left is a purely 2D question: <b>does the wireframe tightly enclose the object?</b>
+          Drag the box depth, then let the refinement loop fix it.
+        </p>
+      </div>
+
+      <div class="card playground reveal">
+        <div class="pg-stage">
+          <svg id="scene" viewBox="0 0 520 360" role="img" aria-label="A car in a road scene with a projected 3D wireframe box whose depth can be adjusted"></svg>
+          <div class="pg-legend">
+            <span><i class="lg lg-obj"></i>Object (true depth)</span>
+            <span><i class="lg lg-box"></i>Candidate box</span>
+          </div>
+        </div>
+
+        <div class="pg-panel">
+          <label class="pg-slider">
+            <span><em>Candidate depth <i>d</i></em><output id="o-d">16.0 m</output></span>
+            <input type="range" id="s-d" min="5" max="22" step="0.1" value="16">
+          </label>
+          <div class="pg-truth">True depth: <b id="o-true">10.0 m</b> · object size <i>s</i><sub>obj</sub> = <b id="o-s">2.40 m</b></div>
+
+          <div class="verdict" id="verdict">
+            <div class="v-row"><small>Visual evidence</small><p id="v-evidence">—</p></div>
+            <div class="v-row"><small>Action tokens</small><p class="tokens" id="v-tokens">—</p></div>
+          </div>
+
+          <div class="pg-actions">
+            <button class="pg-play" id="pg-step"><i class="fas fa-forward-step"></i><span>Apply one step</span></button>
+            <button class="pg-play" id="pg-run"><i class="fas fa-play"></i><span>Refine to the end</span></button>
+            <button class="pg-play pg-ghost" id="pg-reset"><i class="fas fa-shuffle"></i><span>New error</span></button>
+          </div>
+
+          <ol class="trace" id="trace" aria-live="polite"></ol>
+        </div>
+      </div>
+      <p class="note reveal">
+        An illustrative simulation of the refinement loop, not the trained model: the action here is computed from the known
+        true depth, and the step sizes are placeholder fractions of <i>s</i><sub>obj</sub>. In RefineAny3D, the VLM makes this
+        judgment from the rendered image alone.
+      </p>
+    </section>
+
+    <!-- ───────── ABSTRACT ───────── -->
+    <section class="section section-narrow" id="abstract">
+      <div class="section-head reveal">
+        <p class="kicker">Abstract</p>
+      </div>
+      <p class="abstract reveal">
+        Monocular 3D object detection spans two regimes: closed-set detectors operating within a fixed category
+        vocabulary, and open-vocabulary detectors that localize arbitrary categories by leveraging depth foundation models
+        for 3D geometry. We find that current depth foundation models, despite their strong zero-shot generalization, lack
+        the object-level precision 3D detection demands: substituting a state-of-the-art depth foundation model for a
+        strong detector's predicted depth degrades accuracy. Rather than pushing detectors or depth models to be more
+        accurate end-to-end, we treat object-level depth refinement as a stand-alone task and present <b>RefineAny3D</b>,
+        a vision-language model that corrects depth without ever predicting a numerical value. Our key insight is that
+        depth error has a direct visual signature in image space: when projected onto the image, a correctly placed box
+        tightly encloses the object, while a too-far box projects too small and a too-close box projects too large. Depth
+        refinement thus reduces to a visual alignment problem rather than a metric regression problem, which we
+        instantiate by extending the VLM's vocabulary with <b>action tokens</b> that replace numerical depth output with
+        categorical decisions, and by supervising the model on a large-scale chain-of-thought dataset that grounds each
+        decision in explicit visual evidence. Applied as a single post-hoc step, RefineAny3D delivers consistent gains
+        across closed-set detectors, open-vocabulary detectors, and 3D auto-labeling tools, and generalizes to novel
+        categories, scenes, and cameras without retraining.
+      </p>
+    </section>
+
+    <!-- ───────── METHOD ───────── -->
+    <section class="section" id="method">
+      <div class="section-head reveal">
+        <p class="kicker">Method</p>
+        <h2>Reason, act, refine, repeat</h2>
+      </div>
+
+      <figure class="card figure reveal">
+        <a href="static/images/framework.png" data-lightbox><img src="static/images/framework.png" alt="Overview of the RefineAny3D framework" loading="lazy" width="2000" height="611"></a>
+        <figcaption>
+          <b>Overview of RefineAny3D.</b> The candidate box is rendered as a wireframe on the image. The VLM reasons in
+          four steps (identify, recall, evidence, decision) and emits a direction token and a magnitude token. The depth is
+          updated and the loop repeats until <code>&lt;depth_ok&gt;</code> or a step cap.
+        </figcaption>
+      </figure>
+
+      <div class="two-col">
+        <article class="card method-card reveal">
+          <div class="mc-head"><span class="mc-num">01</span><h3>Action tokens</h3><span class="chip">6 new tokens</span></div>
+          <p>
+            VLMs are unreliable at numerical regression, so RefineAny3D never outputs a number. Its vocabulary is extended
+            with a <b>direction</b> token and a <b>magnitude</b> token, each with its own learnable embedding:
+          </p>
+          <div class="token-grid">
+            <span class="tk tk-dir">&lt;depth_closer&gt;</span><span class="tk tk-ok">&lt;depth_ok&gt;</span><span class="tk tk-dir">&lt;depth_farther&gt;</span>
+            <span class="tk tk-mag">&lt;step_small&gt;</span><span class="tk tk-mag">&lt;step_medium&gt;</span><span class="tk tk-mag">&lt;step_large&gt;</span>
+          </div>
+          <div class="eq" data-tex="\Delta d^{(t)} = \mathrm{dir}\bigl(a_d^{(t)}\bigr)\cdot \alpha_{a_m^{(t)}}\, s_{\text{obj}}, \qquad s_{\text{obj}} = \tfrac{w+h+l}{3}"></div>
+          <p class="muted">
+            Steps are relative to the object's own size: 0.5 m is negligible for a distant truck but huge for a nearby cup.
+            Precision lost to discretization is recovered by iterating.
+          </p>
+        </article>
+
+        <article class="card method-card reveal">
+          <div class="mc-head"><span class="mc-num">02</span><h3>3.0M CoT samples</h3><span class="chip">from Omni3D</span></div>
+          <p>
+            Training data is curated from Omni3D (six datasets, indoor and outdoor, 50 categories). After geometric and
+            VLM-based filtering, <b>335K</b> annotations remain. Their depth is perturbed along the camera ray with
+            object-relative, action-balanced magnitudes, giving about <b>3.0M</b> samples.
+          </p>
+          <p>
+            Each sample carries a chain-of-thought rationale before the action, so every decision is grounded in visual
+            evidence rather than a shortcut. Training has two stages: warm up the six token embeddings with the VLM
+            frozen, then fine-tune the LLM with the vision encoder frozen.
+          </p>
+        </article>
+      </div>
+
+      <figure class="card figure reveal" style="margin-top:24px">
+        <a href="static/images/cot.png" data-lightbox><img src="static/images/cot.png" alt="Examples of chain-of-thought supervision" loading="lazy" width="2000" height="633"></a>
+        <figcaption><b>Chain-of-thought supervision.</b> Each training sample pairs a rendered wireframe with a reasoning trace (identify → recall → evidence) that ends in the action tokens.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ───────── RESULTS ───────── -->
+    <section class="section" id="results">
+      <div class="section-head reveal">
+        <p class="kicker">Results</p>
+        <h2>One refiner, three kinds of 3D pipelines</h2>
+        <p class="lead">
+          Applied post hoc, with every other box attribute held fixed, RefineAny3D improves closed-set detectors,
+          open-vocabulary detectors, and 3D auto-labeling.
+        </p>
+      </div>
+
+      <div class="card results reveal">
+        <div class="tabs" role="tablist">
+          <button role="tab" class="is-active" data-tab="t-kitti">Closed-set (KITTI)</button>
+          <button role="tab" data-tab="t-omni">Open-vocab (Omni3D)</button>
+          <button role="tab" data-tab="t-label">Auto-labeling</button>
+          <button role="tab" data-tab="t-bench">Refine3D benchmark</button>
+          <button role="tab" data-tab="t-vlm">Is a VLM necessary?</button>
+        </div>
+
+        <div class="tab-panel is-active" id="t-kitti" role="tabpanel">
+          <p class="tab-caption">KITTI val, Car AP<sub>3D</sub> at IoU<sub>3D</sub> ≥ 0.7. RefineAny3D refines the depth of MonoCoP's predictions.</p>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="l">Method</th><th>Easy</th><th>Mod.</th><th>Hard</th></tr></thead>
+              <tbody>
+                <tr><td class="l">MonoDETR</td><td>28.84</td><td>20.61</td><td>16.38</td></tr>
+                <tr><td class="l">MonoCD</td><td>26.45</td><td>19.37</td><td>16.38</td></tr>
+                <tr><td class="l">FD3D</td><td>28.22</td><td>20.23</td><td>17.04</td></tr>
+                <tr><td class="l">MonoMAE</td><td>30.29</td><td>20.90</td><td>17.61</td></tr>
+                <tr><td class="l">MonoTAKD</td><td>34.36</td><td>22.61</td><td>19.88</td></tr>
+                <tr><td class="l">MonoDGP</td><td>30.76</td><td>22.34</td><td>19.02</td></tr>
+                <tr><td class="l">MonoCoP</td><td>32.06</td><td>23.98</td><td>20.64</td></tr>
+                <tr class="ours"><td class="l">+ RefineAny3D (ours)</td><td><b>35.62</b></td><td><b>27.47</b></td><td><b>21.31</b></td></tr>
+                <tr class="gain"><td class="l">Δ vs. MonoCoP</td><td>+3.56</td><td>+3.49</td><td>+0.67</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="t-omni" role="tabpanel">
+          <p class="tab-caption">Omni3D test, AP<sub>3D</sub> per sub-dataset. RefineAny3D refines DetAny3D conditioned on ground-truth 2D boxes, its strongest variant; only depth changes.</p>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="l">Method</th><th>KITTI</th><th>nuScenes</th><th>SUN RGB-D</th><th>ARKit</th><th>Objectron</th><th>Hypersim</th><th>Overall</th></tr></thead>
+              <tbody>
+                <tr><td class="l">Cube R-CNN</td><td>32.50</td><td>30.06</td><td>15.33</td><td>41.73</td><td>50.84</td><td>7.48</td><td>23.26</td></tr>
+                <tr><td class="l">OVMono3D</td><td>25.45</td><td>24.33</td><td>15.20</td><td>41.60</td><td>58.87</td><td>7.75</td><td>22.98</td></tr>
+                <tr><td class="l">DetAny3D</td><td>31.61</td><td>30.97</td><td>18.96</td><td>46.13</td><td>54.42</td><td>7.17</td><td>24.92</td></tr>
+                <tr><td class="l">DetAny3D w/ GT 2D box</td><td>38.68</td><td>37.55</td><td>46.14</td><td>50.62</td><td>56.82</td><td>15.98</td><td>34.38</td></tr>
+                <tr class="ours"><td class="l">+ RefineAny3D (ours)</td><td><b>43.47</b></td><td><b>44.13</b></td><td><b>48.58</b></td><td><b>54.20</b></td><td><b>59.29</b></td><td><b>17.80</b></td><td><b>38.73</b></td></tr>
+                <tr class="gain"><td class="l">Δ vs. DetAny3D w/ GT 2D</td><td>+4.79</td><td>+6.58</td><td>+2.44</td><td>+3.58</td><td>+2.47</td><td>+1.82</td><td>+4.35</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="t-label" role="tabpanel">
+          <p class="tab-caption">KITTI val AP<sub>3D</sub> of a detector (MonoCoP) trained on each set of labels. Refining LabelAny3D's pseudo-labels narrows the gap to ground truth.</p>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="l">Training labels</th><th>Easy</th><th>Mod.</th><th>Hard</th></tr></thead>
+              <tbody>
+                <tr class="extra"><td class="l">Ground truth (upper bound)</td><td>32.06</td><td>23.98</td><td>20.64</td></tr>
+                <tr><td class="l">LabelAny3D</td><td>13.57</td><td>11.78</td><td>10.27</td></tr>
+                <tr class="ours"><td class="l">+ RefineAny3D (ours)</td><td><b>15.76</b></td><td><b>14.15</b></td><td><b>10.99</b></td></tr>
+                <tr class="gain"><td class="l">Δ vs. LabelAny3D</td><td>+2.19</td><td>+2.37</td><td>+0.72</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="t-bench" role="tabpanel">
+          <p class="tab-caption">Refine3D, our standalone benchmark on Omni3D. DirAcc: direction correct; FullAcc: direction and magnitude correct; DepthErr: residual depth gap (lower is better).</p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th rowspan="2" class="l">Method</th><th colspan="3">Standard</th><th colspan="3">Novel category</th><th colspan="3">Novel camera</th></tr>
+                <tr><th>DirAcc</th><th>FullAcc</th><th>DepthErr</th><th>DirAcc</th><th>FullAcc</th><th>DepthErr</th><th>DirAcc</th><th>FullAcc</th><th>DepthErr</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="l">Qwen3-VL-8B</td><td>28.7</td><td>11.4</td><td>0.32</td><td>27.5</td><td>10.9</td><td>0.37</td><td>28.3</td><td>11.1</td><td>0.33</td></tr>
+                <tr><td class="l">Qwen3-VL-8B w/ our data</td><td>75.6</td><td>55.4</td><td>0.21</td><td>56.3</td><td>41.2</td><td>0.27</td><td>68.7</td><td>49.8</td><td>0.23</td></tr>
+                <tr class="ours"><td class="l">RefineAny3D (ours)</td><td><b>89.2</b></td><td><b>76.7</b></td><td><b>0.16</b></td><td><b>74.4</b></td><td><b>58.5</b></td><td><b>0.19</b></td><td><b>85.6</b></td><td><b>73.2</b></td><td><b>0.17</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="t-vlm" role="tabpanel">
+          <p class="tab-caption">Refining MonoCoP's depth on KITTI val (AP<sub>3D</sub>, IoU<sub>3D</sub> ≥ 0.7). Geometric fitting even uses the ground-truth 2D box.</p>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th class="l">Method</th><th>Easy</th><th>Mod.</th><th>Hard</th></tr></thead>
+              <tbody>
+                <tr><td class="l">MonoCoP</td><td>32.06</td><td>23.98</td><td>20.64</td></tr>
+                <tr><td class="l">Geometric fitting</td><td>29.89</td><td>21.55</td><td>18.36</td></tr>
+                <tr><td class="l">Geometric fitting (GT dims + yaw)</td><td>30.56</td><td>21.79</td><td>18.43</td></tr>
+                <tr><td class="l">DINOv2 action classifier</td><td>24.71</td><td>17.62</td><td>12.78</td></tr>
+                <tr class="ours"><td class="l">RefineAny3D (ours)</td><td><b>35.62</b></td><td><b>27.47</b></td><td><b>21.31</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="tab-caption" style="margin-top:12px">Both simpler judges make MonoCoP worse. The gain comes from the VLM's visual judgment, not the discrete action space alone.</p>
+        </div>
+      </div>
+
+      <div class="fig-row fig-row-2">
+        <figure class="card figure reveal">
+          <a href="static/images/iterations.png" data-lightbox><img src="static/images/iterations.png" alt="AP3D versus number of refinement iterations on KITTI Moderate" loading="lazy" width="2000" height="1410"></a>
+          <figcaption><b>Fast convergence.</b> On KITTI Moderate, one step recovers about 85% of the gain (+2.95); a second adds +0.54, after which accuracy plateaus. We cap refinement at two steps.</figcaption>
+        </figure>
+
+        <div class="card ablation reveal" style="margin-top:0">
+          <div class="abl-head">
+            <h3>What matters in the design?</h3>
+            <p>Refine3D standard split, FullAcc (direction and magnitude both correct). Each row changes one choice.</p>
+          </div>
+          <div class="bars" data-min="50" data-max="80">
+            <div class="bar-row"><span class="bar-name">Plain-text actions</span><span class="bar"><i data-v="55.4"></i></span><span class="bar-v">55.4</span></div>
+            <div class="bar-row"><span class="bar-name">One joint token per action</span><span class="bar"><i data-v="72.5"></i></span><span class="bar-v">72.5</span></div>
+            <div class="bar-row"><span class="bar-name">No chain-of-thought</span><span class="bar"><i data-v="70.2"></i></span><span class="bar-v">70.2</span></div>
+            <div class="bar-row"><span class="bar-name">Unfrozen vision encoder</span><span class="bar"><i data-v="69.6"></i></span><span class="bar-v">69.6</span></div>
+            <div class="bar-row is-ours"><span class="bar-name">RefineAny3D (dir + mag)</span><span class="bar"><i data-v="76.7"></i></span><span class="bar-v">76.7</span></div>
+          </div>
+          <p class="muted">
+            Factored direction and magnitude tokens each see about a third of the training samples, versus about a
+            seventh for joint tokens. Chain-of-thought and a frozen vision encoder both matter too.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── GALLERY ───────── -->
+    <section class="section" id="gallery">
+      <div class="section-head reveal">
+        <p class="kicker">Qualitative results</p>
+        <h2>From red to green</h2>
+      </div>
+
+      <div class="card gallery reveal">
+        <div class="tabs" role="tablist">
+          <button role="tab" class="is-active" data-tab="g-main">Single vs. iterative steps</button>
+          <button role="tab" data-tab="g-more">More examples</button>
+        </div>
+        <div class="tab-panel is-active" id="g-main" role="tabpanel">
+          <a href="static/images/qual_main.jpg" data-lightbox><img src="static/images/qual_main.jpg" alt="RefineAny3D refining DetAny3D predictions with single and multiple steps" loading="lazy" width="2000" height="1116"></a>
+          <p class="tab-caption">RefineAny3D refines DetAny3D's initial prediction (red) to the final box (green), with the emitted action tokens. Most cases need one step; some take two (yellow is the intermediate box).</p>
+        </div>
+        <div class="tab-panel" id="g-more" role="tabpanel">
+          <a href="static/images/qual_more.jpg" data-lightbox class="gal-narrow"><img src="static/images/qual_more.jpg" alt="Additional qualitative refinement examples on Omni3D" loading="lazy" width="1793" height="2000"></a>
+          <p class="tab-caption">More examples on Omni3D, across indoor and outdoor scenes and many categories. Click to enlarge.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── BIBTEX ───────── -->
+    <section class="section section-narrow" id="bibtex">
+      <div class="section-head reveal">
+        <p class="kicker">Citation</p>
+        <h2>BibTeX</h2>
+      </div>
+      <div class="bib reveal">
+        <button class="copy" id="copy-bib"><i class="far fa-copy"></i><span>Copy</span></button>
+<pre id="bib-text">@inproceedings{zhang2026refineany3d,
+  title     = {RefineAny3D: Depth Refinement as Semantic Alignment
+               for Monocular 3D Detection},
+  author    = {Zhang, Zhihao and Zhang, Gengwei and Chen, Tianlong and
+               Liu, Xiaoming},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026}
+}</pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 Zhihao Zhang · <a href="https://alanzhangcs.github.io/">alanzhangcs.github.io</a></p>
+  </footer>
+
+  <!-- Lightbox -->
+  <div id="lightbox" hidden>
+    <div class="lb-backdrop"></div>
+    <img id="lb-img" alt="">
+    <button id="lb-close" aria-label="Close"><i class="fas fa-xmark"></i></button>
+  </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="static/js/main.js"></script>
+</body>
+</html>
