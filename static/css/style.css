@@ -333,13 +333,13 @@ main { position: relative; z-index: 1; }
 }
 .section h2 {
   margin: 0;
-  font-size: clamp(26px, 3.6vw, 38px);
-  line-height: 1.18;
+  font-size: clamp(26px, 3vw, 32px);
+  line-height: 1.2;
   font-weight: 900;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
-.lead { margin: 16px 0 0; color: var(--text-2); font-size: 17.5px; }
+.lead { margin: 12px 0 0; color: var(--text-2); font-size: 17.5px; }
 .card {
   background: var(--card);
   border: 1px solid var(--border);
