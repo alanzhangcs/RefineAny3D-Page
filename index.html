@@ -79,7 +79,7 @@
     <!-- ───────── TEASER + TL;DR ───────── -->
     <section class="teaser-wrap">
       <figure class="card figure teaser reveal">
-        <a href="static/images/teaser.png" data-lightbox><img src="static/images/teaser.png" alt="RefineAny3D overview: depth is the bottleneck, reason-act-refine loop, semantic alignment, and results" width="2000" height="1167"></a>
+        <a href="static/images/teaser.png" data-lightbox><img src="static/images/teaser.png" alt="RefineAny3D overview: depth is the bottleneck, reason-act-refine loop, semantic alignment, and results" width="2000" height="1168"></a>
         <figcaption>
           <b>(a)</b> Object depth is the bottleneck: ground-truth depth adds +29.92 AP<sub>3D</sub> on Omni3D, while a depth foundation model (DFM) <em>lowers</em> it by 3.68.
           <b>(b)</b> A VLM emits action tokens that iteratively adjust depth.
@@ -161,8 +161,8 @@
       </div>
       <p class="note reveal">
         An illustrative simulation of the refinement loop, not the trained model: the action here is computed from the known
-        true depth, and the step sizes are placeholder fractions of <i>s</i><sub>obj</sub>. In RefineAny3D, the VLM makes this
-        judgment from the rendered image alone.
+        true depth. The step sizes follow the paper (0.20, 0.55 and 1.10 &times; <i>s</i><sub>obj</sub> for small, medium
+        and large). In RefineAny3D, the VLM makes this judgment from the rendered image alone.
       </p>
     </section>
 
@@ -197,7 +197,7 @@
       </div>
 
       <figure class="card figure reveal">
-        <a href="static/images/framework.png" data-lightbox><img src="static/images/framework.png" alt="Overview of the RefineAny3D framework" loading="lazy" width="2000" height="611"></a>
+        <a href="static/images/framework.png" data-lightbox><img src="static/images/framework.png" alt="Overview of the RefineAny3D framework" loading="lazy" width="2000" height="612"></a>
         <figcaption>
           <b>Overview of RefineAny3D.</b> The candidate box is rendered as a wireframe on the image. The VLM reasons in
           four steps (identify, recall, evidence, decision) and emits a direction token and a magnitude token. The depth is

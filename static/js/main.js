@@ -157,8 +157,8 @@
   var OBJ = { x: 0.35, W: 1.8, H: 1.5, L: 4.2 };
   var Z_TRUE = 10;
   var S_OBJ = (OBJ.W + OBJ.H + OBJ.L) / 3;  // 2.5 m
-  var ALPHA = { small: 0.4, medium: 1.2, large: 2.5 };   // illustrative only
-  var OK_TOL = 0.2, MAX_STEPS = 5;
+  var ALPHA = { small: 0.20, medium: 0.55, large: 1.10 };  // paper, Appendix: bucket midpoints
+  var OK_TOL = 0.10, MAX_STEPS = 8;                        // |r| <= 0.10 is <depth_ok>
 
   var slider = document.getElementById('s-d');
   var outD = document.getElementById('o-d');
@@ -227,8 +227,8 @@
 
   function judge(d) {
     var e = (d - Z_TRUE) / S_OBJ;
-    if (Math.abs(e) < OK_TOL) return { dir: 'ok', mag: null, e: e };
-    var mag = Math.abs(e) < 0.8 ? 'small' : Math.abs(e) < 2 ? 'medium' : 'large';
+    if (Math.abs(e) <= OK_TOL + 1e-9) return { dir: 'ok', mag: null, e: e };
+    var mag = Math.abs(e) < 0.30 ? 'small' : Math.abs(e) < 0.80 ? 'medium' : 'large';
     return { dir: e > 0 ? 'closer' : 'farther', mag: mag, e: e };
   }
   function tokenHTML(j) {
